@@ -1,8 +1,9 @@
 using System.Runtime.InteropServices;
+using Winharpoon.Core.Interfaces;
 
-namespace Winharpoon;
+namespace Winharpoon.Platforms.Windows;
 
-public class HotkeyManager : IDisposable
+public class WindowsHotkeyManager : IHotkeyManager
 {
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -12,12 +13,10 @@ public class HotkeyManager : IDisposable
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
 
-    // Modifier keys
     private const uint MOD_CONTROL = 0x0002;
     private const uint MOD_SHIFT = 0x0004;
     private const uint MOD_NOREPEAT = 0x4000;
 
-    // Virtual key codes
     private const uint VK_0 = 0x30;
     private const uint VK_1 = 0x31;
     private const uint VK_H = 0x48;
@@ -25,13 +24,12 @@ public class HotkeyManager : IDisposable
     private const uint VK_N = 0x4E;
     private const uint VK_P = 0x50;
 
-    // Hotkey IDs
     public const int HOTKEY_MARK_MODE = 100;
-    public const int HOTKEY_SLOT_BASE = 200; // 200-208 for slots 1-9
+    public const int HOTKEY_SLOT_BASE = 200;
     public const int HOTKEY_CYCLE_NEXT = 300;
     public const int HOTKEY_CYCLE_PREV = 301;
     public const int HOTKEY_SHOW_OVERLAY = 302;
-    public const int HOTKEY_CLEAR_SLOT_BASE = 400; // 400-408 for clear slots 1-9
+    public const int HOTKEY_CLEAR_SLOT_BASE = 400;
     public const int HOTKEY_CLEAR_ALL = 409;
 
     private readonly IntPtr _hwnd;
@@ -46,7 +44,7 @@ public class HotkeyManager : IDisposable
     public event Action<int>? OnClearSlot;
     public event Action? OnClearAll;
 
-    public HotkeyManager(IntPtr hwnd)
+    public WindowsHotkeyManager(IntPtr hwnd)
     {
         _hwnd = hwnd;
     }
@@ -55,10 +53,8 @@ public class HotkeyManager : IDisposable
     {
         bool success = true;
 
-        // Register Ctrl+Shift+M for mark mode
         success &= TryRegister(HOTKEY_MARK_MODE, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, VK_M);
 
-        // Register Ctrl+Shift+1 through Ctrl+Shift+9 for slots
         for (int i = 0; i < 9; i++)
         {
             int hotkeyId = HOTKEY_SLOT_BASE + i;
@@ -66,16 +62,9 @@ public class HotkeyManager : IDisposable
             success &= TryRegister(hotkeyId, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, vk);
         }
 
-        // Register Ctrl+Shift+N for cycle next
         success &= TryRegister(HOTKEY_CYCLE_NEXT, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, VK_N);
-
-        // Register Ctrl+Shift+P for cycle prev
         success &= TryRegister(HOTKEY_CYCLE_PREV, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, VK_P);
-
-        // Register Ctrl+Shift+H for show overlay
         success &= TryRegister(HOTKEY_SHOW_OVERLAY, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, VK_H);
-
-        // Register Ctrl+Shift+0 for clear all (used after mark mode)
         success &= TryRegister(HOTKEY_CLEAR_ALL, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, VK_0);
 
         return success;

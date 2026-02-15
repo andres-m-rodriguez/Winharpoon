@@ -1,6 +1,8 @@
-using System.Runtime.InteropServices;
+using Winharpoon.Core.Interfaces;
+using Winharpoon.Core.Services;
+using Winharpoon.Platforms.Windows;
 
-namespace Winharpoon;
+namespace Winharpoon.App;
 
 internal class Program
 {
@@ -10,7 +12,6 @@ internal class Program
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
 
-        // Prevent multiple instances
         using var mutex = new Mutex(true, "Winharpoon_SingleInstance", out bool createdNew);
         if (!createdNew)
         {
@@ -18,7 +19,11 @@ internal class Program
             return;
         }
 
-        using var app = new WinharpoonApp();
+        // Create platform-specific implementations
+        IWindowManager windowManager = new WindowsWindowManager();
+        IStartupManager startupManager = new WindowsStartupManager();
+
+        using var app = new WinharpoonApp(windowManager, startupManager);
         app.Run();
     }
 }
@@ -26,7 +31,7 @@ internal class Program
 internal class WinharpoonApp : IDisposable
 {
     private readonly HarpoonState _state;
-    private readonly HotkeyManager _hotkeyManager;
+    private readonly IHotkeyManager _hotkeyManager;
     private readonly TrayIcon _trayIcon;
     private readonly HotkeyWindow _hotkeyWindow;
     private readonly MarksOverlay _marksOverlay;
@@ -37,18 +42,17 @@ internal class WinharpoonApp : IDisposable
     private static readonly TimeSpan MarkModeTimeout = TimeSpan.FromSeconds(3);
     private bool _disposed;
 
-    public WinharpoonApp()
+    public WinharpoonApp(IWindowManager windowManager, IStartupManager startupManager)
     {
-        _state = new HarpoonState();
+        _state = new HarpoonState(windowManager);
         _hotkeyWindow = new HotkeyWindow();
-        _hotkeyManager = new HotkeyManager(_hotkeyWindow.Handle);
-        _trayIcon = new TrayIcon(_state);
+        _hotkeyManager = new WindowsHotkeyManager(_hotkeyWindow.Handle);
+        _trayIcon = new TrayIcon(_state, startupManager);
         _marksOverlay = new MarksOverlay(_state);
 
         _markModeTimer = new System.Windows.Forms.Timer { Interval = 100 };
         _markModeTimer.Tick += CheckMarkModeTimeout;
 
-        // Wire up events
         _hotkeyWindow.OnHotkey += OnHotkey;
         _hotkeyManager.OnMarkModeActivated += OnMarkModeActivated;
         _hotkeyManager.OnSlotActivated += OnSlotActivated;
@@ -59,7 +63,6 @@ internal class WinharpoonApp : IDisposable
         _hotkeyManager.OnClearSlot += OnClearSlot;
         _trayIcon.OnExitRequested += () => Application.Exit();
 
-        // Register hotkeys
         if (!_hotkeyManager.RegisterHotkeys())
         {
             MessageBox.Show("Failed to register some hotkeys. Some key combinations may already be in use.",
@@ -139,7 +142,6 @@ internal class WinharpoonApp : IDisposable
     {
         if (_inMarkMode)
         {
-            // In mark mode, Ctrl+Shift+0 clears all marks
             _state.ClearAll();
             _trayIcon.ShowNotification("Winharpoon", "All marks cleared.", 1500);
             ExitMarkMode();

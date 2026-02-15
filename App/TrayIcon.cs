@@ -1,45 +1,47 @@
 using System.Drawing;
+using Winharpoon.Core.Interfaces;
+using Winharpoon.Core.Models;
+using Winharpoon.Core.Services;
 
-namespace Winharpoon;
+namespace Winharpoon.App;
 
-public class TrayIcon : IDisposable
+public class TrayIcon : ITrayIcon
 {
     private readonly NotifyIcon _notifyIcon;
     private readonly ContextMenuStrip _contextMenu;
     private readonly HarpoonState _state;
+    private readonly IStartupManager _startupManager;
     private readonly ToolStripMenuItem _marksMenuItem;
     private readonly ToolStripMenuItem _startupMenuItem;
     private bool _disposed;
 
     public event Action? OnExitRequested;
 
-    public TrayIcon(HarpoonState state)
+    public TrayIcon(HarpoonState state, IStartupManager startupManager)
     {
         _state = state;
+        _startupManager = startupManager;
 
         _contextMenu = new ContextMenuStrip();
 
-        // Marks submenu
         _marksMenuItem = new ToolStripMenuItem("Marks");
         _contextMenu.Items.Add(_marksMenuItem);
 
         _contextMenu.Items.Add(new ToolStripSeparator());
 
-        // Run at startup toggle
         _startupMenuItem = new ToolStripMenuItem("Run at startup")
         {
-            Checked = StartupManager.IsStartupEnabled(),
+            Checked = _startupManager.IsStartupEnabled(),
             CheckOnClick = true
         };
         _startupMenuItem.Click += (_, _) =>
         {
-            StartupManager.SetStartupEnabled(_startupMenuItem.Checked);
+            _startupManager.SetStartupEnabled(_startupMenuItem.Checked);
         };
         _contextMenu.Items.Add(_startupMenuItem);
 
         _contextMenu.Items.Add(new ToolStripSeparator());
 
-        // Hotkeys help submenu
         var helpMenu = new ToolStripMenuItem("Hotkeys");
         helpMenu.DropDownItems.Add(new ToolStripMenuItem("Ctrl+Shift+M, 1-9: Mark window") { Enabled = false });
         helpMenu.DropDownItems.Add(new ToolStripMenuItem("Ctrl+Shift+M, 0: Clear all marks") { Enabled = false });
@@ -50,7 +52,6 @@ public class TrayIcon : IDisposable
 
         _contextMenu.Items.Add(new ToolStripSeparator());
 
-        // Exit
         var exitItem = new ToolStripMenuItem("Exit");
         exitItem.Click += (_, _) => OnExitRequested?.Invoke();
         _contextMenu.Items.Add(exitItem);
@@ -63,11 +64,9 @@ public class TrayIcon : IDisposable
             ContextMenuStrip = _contextMenu
         };
 
-        // Subscribe to state changes
         _state.OnWindowMarked += OnWindowMarked;
         _state.OnWindowUnmarked += OnWindowUnmarked;
 
-        // Initial update
         UpdateMarksMenu();
     }
 
@@ -103,7 +102,6 @@ public class TrayIcon : IDisposable
 
             var item = new ToolStripMenuItem(displayText);
 
-            // Add clear option
             var clearItem = new ToolStripMenuItem("Clear");
             int slot = mark.Slot;
             clearItem.Click += (_, _) => _state.ClearSlot(slot);
@@ -145,7 +143,6 @@ public class TrayIcon : IDisposable
 
     private static Icon CreateHarpoonIcon()
     {
-        // Create a simple 16x16 icon with an "H" for Harpoon
         using var bitmap = new Bitmap(16, 16);
         using var graphics = Graphics.FromImage(bitmap);
 

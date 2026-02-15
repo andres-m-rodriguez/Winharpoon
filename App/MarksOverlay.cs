@@ -1,4 +1,8 @@
-namespace Winharpoon;
+using System.Drawing;
+using Winharpoon.Core.Models;
+using Winharpoon.Core.Services;
+
+namespace Winharpoon.App;
 
 public class MarksOverlay : Form
 {
@@ -49,7 +53,7 @@ public class MarksOverlay : Form
 
         _hintLabel = new Label
         {
-            Text = "Press 1-9 to switch • Enter to select • Esc to close • Del to remove",
+            Text = "Press 1-9 to switch | Enter to select | Esc to close | Del to remove",
             ForeColor = Color.FromArgb(120, 120, 120),
             Font = new Font("Segoe UI", 9),
             AutoSize = false,
